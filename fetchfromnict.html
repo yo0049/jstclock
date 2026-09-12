@@ -2,49 +2,51 @@
 <html lang="ja">
 <head>
 <meta charset="UTF-8">
-<title>日本標準時</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<title>NICT Clock</title>
 
 <style>
-html,body{
-    margin:0;
-    padding:0;
-    overflow:hidden;
-    font-family:monospace;
+html,
+body {
+    margin: 0;
+    padding: 0;
+    overflow: hidden;
+    font-family: monospace;
 }
 
-body{
-    display:flex;
-    justify-content:center;
-    align-items:center;
-    min-height:100vh;
+body {
+    display: flex;
+    justify-content: center;
+    align-items: center;
 }
 
-#display{
-    display:flex;
-    flex-direction:column;
-    align-items:center;
-    justify-content:center;
-    margin:0;
-    padding:0;
-    line-height:1;
+#display {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    margin: 0;
+    padding: 0;
+    line-height: 1;
 }
 
-#date{
-    margin:0;
-    padding:0;
-    font-size:100%;
-    line-height:1;
-    text-align:center;
-    white-space:nowrap;
+#date {
+    margin: 0;
+    padding: 0;
+    font-size: 100%;
+    line-height: 1;
+    text-align: center;
+    white-space: nowrap;
 }
 
-#clock{
-    margin:0;
-    padding:0;
-    font-size:500%;
-    line-height:1;
-    text-align:center;
-    white-space:nowrap;
+#clock {
+    margin: 0;
+    padding: 0;
+    font-size: 500%;
+    line-height: 1;
+    text-align: center;
+    white-space: nowrap;
 }
 </style>
 </head>
@@ -52,76 +54,109 @@ body{
 <body>
 
 <div id="display">
-    <div id="date">取得中...</div>
-    <div id="clock">--:--:--.---</div>
+    <div id="date"></div>
+    <div id="clock">Connecting...</div>
 </div>
 
 <script>
-(function(){
+let timeOffset = 0;
+let basePerformance = 0;
 
-    const dateE = document.getElementById('date');
-    const clockE = document.getElementById('clock');
 
-    let baseTime = 0;
-    let basePerformance = 0;
+/*
+ * NICT JSONP
+ *
+ * NICTから
+ *
+ * jsont({
+ *     "id": "...",
+ *     "it": ...,
+ *     "st": ...
+ * })
+ *
+ * の形式で返ってくる。
+ */
+window.jsont = function(data) {
 
-    async function getNictTime() {
-        /*
-         * NICT 日本標準時 JSONサービス
-         *
-         * st = サーバーから供給された時刻（UNIX時刻）
-         */
-        const before = performance.now();
+    const received = performance.now();
 
-        const response = await fetch(
-            'https://ntp-a1.nict.go.jp/cgi-bin/json?' + Date.now(),
-            { cache: 'no-store' }
-        );
+    /*
+     * it = NICTへ送信された時刻
+     * st = NICTのサーバー時刻
+     *
+     * 往復時間の半分を通信遅延として補正する。
+     */
+    const sent = data.it * 1000;
+    const server = data.st * 1000;
 
-        const after = performance.now();
+    const localAtReceive = Date.now();
 
-        const data = await response.json();
+    timeOffset =
+        server +
+        (localAtReceive - sent) / 2 -
+        localAtReceive;
 
-        /*
-         * 通信時間の半分を補正。
-         * NICTから返ってきた時刻が通信の中間時点のものだと
-         * 仮定して、おおまかにネットワーク遅延を補正する。
-         */
-        const roundTrip = after - before;
+    basePerformance = received;
 
-        baseTime = data.st * 1000 + roundTrip / 2;
-        basePerformance = after;
+    updateClock();
+};
 
-        update();
-    }
 
-    function update() {
-        if (!baseTime) return;
+/*
+ * NICTから時刻を取得
+ */
+function getNictTime() {
 
-        const elapsed = performance.now() - basePerformance;
-        const now = new Date(baseTime + elapsed);
+    const script = document.createElement('script');
 
-        const y = now.getFullYear();
-        const m = String(now.getMonth() + 1).padStart(2, '0');
-        const d = String(now.getDate()).padStart(2, '0');
+    /*
+     * キャッシュを避けるため時刻を付加
+     */
+    script.src =
+        'https://ntp-a1.nict.go.jp/cgi-bin/jsont?' +
+        (Date.now() / 1000);
 
-        const h = String(now.getHours()).padStart(2, '0');
-        const i = String(now.getMinutes()).padStart(2, '0');
-        const s = String(now.getSeconds()).padStart(2, '0');
-        const ms = String(now.getMilliseconds()).padStart(3, '0');
+    script.onerror = function() {
+        document.getElementById('clock').textContent =
+            'Failed to fetch';
+    };
 
-        dateE.textContent = `${y}/${m}/${d}`;
-        clockE.textContent = `${h}:${i}:${s}.${ms}`;
+    document.body.appendChild(script);
+}
 
-        requestAnimationFrame(update);
-    }
 
-    getNictTime().catch(function(error) {
-        dateE.textContent = '取得失敗';
-        clockE.textContent = error.message;
-    });
+/*
+ * 時計表示
+ */
+function updateClock() {
 
-})();
+    const now = new Date(
+        Date.now() + timeOffset
+    );
+
+    const pad = (value, digits = 2) =>
+        String(value).padStart(digits, '0');
+
+    document.getElementById('date').textContent =
+        now.getFullYear() + '/' +
+        pad(now.getMonth() + 1) + '/' +
+        pad(now.getDate());
+
+    document.getElementById('clock').textContent =
+        pad(now.getHours()) + ':' +
+        pad(now.getMinutes()) + ':' +
+        pad(now.getSeconds()) + '.' +
+        pad(now.getMilliseconds(), 3);
+
+    setTimeout(updateClock, 50);
+}
+
+
+/*
+ * 開始
+ */
+getNictTime();
+
 </script>
 
 </body>
