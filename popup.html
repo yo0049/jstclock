@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NTP Clock Launcher</title>
+    <style>
+        body {
+            font-family: sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            margin: 0;
+            background: #1a1a2e;
+            color: #fff;
+        }
+        button {
+            padding: 15px 30px;
+            font-size: 18px;
+            border: none;
+            border-radius: 8px;
+            background: #e94560;
+            color: white;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+        button:hover {
+            background: #ff6b81;
+        }
+        p {
+            margin-top: 10px;
+            color: #aaa;
+            font-size: 14px;
+        }
+    </style>
+</head>
+<body>
+    <button onclick="openClock()">NTP Clock をポップアップで開く</button>
+    <p>※ ポップアップブロッカーが有効な場合は許可してください</p>
+
+    <script>
+        function openClock() {
+            const url = "https://yo0049.github.io/ntp_clock/";
+            const features = "popup=yes,width=450,height=650,resizable=yes,scrollbars=no";
+            window.open(url, "NTPClockPopup", features);
+        }
+    </script>
+</body>
+</html>
